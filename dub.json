@@ -1,0 +1,45 @@
+{
+	"dependencies": {
+		"btrfs-recovery-tools:btrfs-recovery-map": ">=0.0.0",
+		"btrfs-recovery-tools:btrfs-scanner": ">=0.0.0",
+	},
+	"license": "UNLICENSE",
+	"name": "btrfs-recovery-tools",
+	"subPackages": [
+		{
+			"dependencies": {
+				"crypto": "~>0.2.16",
+				"d2sqlite3": "~>1.0.0",
+				"progress": "~>5.0.1",
+				"xxhash": "~master"
+			},
+			"excludedSourceFiles": [
+				"source/btrfs-recovery-map.d"
+			],
+			"name": "btrfs-scanner",
+			"stringImportPaths": [
+				"resources"
+			],
+			"targetName": "btrfs-scanner",
+			"targetType": "executable"
+		},
+		{
+			"dependencies": {
+				"crypto": "~>0.2.16",
+				"d2sqlite3": "~>1.0.0",
+				"progress": "~>5.0.1",
+				"xxhash": "~master"
+			},
+			"excludedSourceFiles": [
+				"source/btrfs-scanner.d"
+			],
+			"name": "btrfs-recovery-map",
+			"stringImportPaths": [
+				"resources"
+			],
+			"targetName": "btrfs-recovery-map",
+			"targetType": "executable"
+		}
+	],
+	"targetType": "none"
+}
