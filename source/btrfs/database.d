@@ -48,6 +48,11 @@ public:
         db.run(import("indexes.sql"));
     }
 
+    void clearRefs(const(ubyte[UUID_SIZE])[] deviceUuids)
+    {
+        db.execute("DELETE FROM refs WHERE deviceUuid IN (:uuids)", deviceUuids);
+    }
+
     bool storeSuperblock(ubyte[UUID_SIZE] deviceUuid, size_t offset, const ref Superblock superblock)
     {
         // deviceUuid, offset, isValid, label, bytenr, generation, fsid, numDevices, csum, csumType, sectorsize, nodesize, root, chunkRoot

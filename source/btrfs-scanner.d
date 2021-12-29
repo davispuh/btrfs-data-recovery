@@ -6,7 +6,7 @@ import std.conv : to;
 import std.format : format;
 import std.algorithm.searching : maxElement, countUntil, canFind, any;
 import std.algorithm.sorting : sort;
-import std.algorithm.iteration : uniq, map;
+import std.algorithm.iteration : uniq, map, reduce;
 import std.algorithm.setops : setDifference;
 import std.array : array, join;
 import std.exception : ErrnoException;
@@ -204,12 +204,11 @@ void scanDevices(string[] devices, ref string[Tid] threads)
     }
 }
 
-bool scanBlocks(string[] devices, ulong[] blocks, Tree tree, ref string[Tid] threads)
+bool scanBlocks(FilesystemState[ubyte[FSID_SIZE]] filesystemStates, ulong[] blocks, Tree tree, ref string[Tid] threads)
 {
     bool[ulong] found;
     blocks = blocks.sort.uniq.array;
     auto allBlocks = blocks;
-    FilesystemState[ubyte[FSID_SIZE]] filesystemStates = FilesystemState.create(devices, &registerError);
 
     foreach (fsid, fs; filesystemStates)
     {
@@ -396,7 +395,17 @@ int main(string[] args)
     string[] devices = args[1..$].sort.uniq.array;
     if (blocks.length > 0 || tree != Tree.none)
     {
-        if (!scanBlocks(devices, blocks, tree, scannerThreads))
+        FilesystemState[ubyte[FSID_SIZE]] filesystemStates = FilesystemState.create(devices, &registerError);
+        if (tree == Tree.all)
+        {
+            const(ubyte[UUID_SIZE])[] deviceUUIDs;
+            foreach (fsid, fs; filesystemStates)
+            {
+                deviceUUIDs ~= fs.getAllDeviceUUIDs();
+            }
+            db.clearRefs(deviceUUIDs);
+        }
+        if (!scanBlocks(filesystemStates, blocks, tree, scannerThreads))
         {
             return -3;
         }

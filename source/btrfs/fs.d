@@ -406,6 +406,11 @@ public:
         return this.devices[deviceUUID];
     }
 
+    const(ubyte[UUID_SIZE])[] getAllDeviceUUIDs() const
+    {
+        return (cast(Device[ubyte[UUID_SIZE]])this.devices).keys;
+    }
+
     shared(Device[ubyte[UUID_SIZE]]) getAllDevices() shared
     {
         return this.devices;
