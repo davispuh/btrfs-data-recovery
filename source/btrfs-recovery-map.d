@@ -1,13 +1,15 @@
 module btrfs.cli.recovery.map;
 
-import std.stdio : stdout, stderr;
+import std.stdio : stdout, stdin, stderr, readln;
 import std.getopt : getopt, config, arraySep, defaultGetoptPrinter;
 import std.conv : to, ConvException;
 import std.algorithm.sorting : sort;
-import std.algorithm.iteration : uniq, map;
+import std.algorithm.iteration : uniq, map, splitter;
 import std.array : array, join;
 import std.json : toJSON, JSONValue, JSONOptions;
+import std.string : strip;
 import std.uuid : UUID;
+import core.sys.posix.unistd : isatty;
 import btrfs.device : Device, DeviceException;
 import btrfs.superblock : Superblock, loadSuperblock;
 import btrfs.block : Block;
@@ -44,6 +46,23 @@ int main(string[] args)
     {
         stderr.writeln("Invalid block number: " ~ args[1..$].join(", "));
         return -1;
+    }
+
+    if (!isatty(stdin.fileno))
+    {
+        char[] line;
+        while (readln(line) > 0)
+        {
+            try
+            {
+                blocks ~= line.strip.splitter(",").map!(b => b.to!ulong).array;
+            } catch (ConvException e)
+            {
+                stderr.writeln("Invalid block number: " ~ line);
+                return -1;
+            }
+        }
+        blocks = blocks.sort.uniq.array;
     }
 
     if (blocks.length <= 0)
