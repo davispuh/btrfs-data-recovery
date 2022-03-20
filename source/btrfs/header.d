@@ -20,6 +20,16 @@ struct HeaderData
     ObjectID owner;
     uint32_t nritems;
     uint8_t level;
+
+    @nogc const bool isLeaf() pure nothrow return
+    {
+        return this.level == 0;
+    }
+
+    @nogc const bool isNode() pure nothrow return
+    {
+        return !this.isLeaf();
+    }
 }
 
 enum ObjectID : int64_t

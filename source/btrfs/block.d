@@ -81,6 +81,16 @@ struct Block
         return true;
     }
 
+    @nogc const bool isLeaf() pure nothrow return
+    {
+        return this.rawData.header.isLeaf();
+    }
+
+    @nogc const bool isNode() pure nothrow return
+    {
+        return this.rawData.header.isNode();
+    }
+
     @property @nogc ref const(BlockData) data() const pure nothrow return
     {
         return *(this.rawData - this.offset);

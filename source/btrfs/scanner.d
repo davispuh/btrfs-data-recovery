@@ -147,7 +147,7 @@ private:
                     {
                         result = device.free(this.memFreeOffset, offset - this.memFreeOffset + this.masterSuperblock.nodesize);
                         this.memFreeOffset = offset + this.masterSuperblock.nodesize;
-                    } else if (completedProgress.block.level > 0 || completedProgress.block.owner != ObjectID.CHUNK_TREE)
+                    } else if (completedProgress.block.isNode() || completedProgress.block.owner != ObjectID.CHUNK_TREE)
                     {
                         // we don't want to free Chunk items
                         result = device.free(offset, this.masterSuperblock.nodesize);
@@ -406,7 +406,7 @@ public:
                     }
                     if (block.matches() && block.owner == this.progress.owner)
                     {
-                        if (block.level > 0)
+                        if (block.isNode())
                         {
                             for (int i=0; i < block.nritems; i++)
                             {
