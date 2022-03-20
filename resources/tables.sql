@@ -36,10 +36,13 @@ CREATE TABLE IF NOT EXISTS blocks(
 CREATE TABLE IF NOT EXISTS refs(
     deviceUuid BLOB(16) NOT NULL,
     bytenr INTEGER NOT NULL,
+    owner INTEGER NULL,
     child INTEGER NOT NULL,
-    childGeneration INTEGER NOT NULL,
+    childGeneration INTEGER NULL,
     PRIMARY KEY (deviceUuid, bytenr, child)
 ) WITHOUT ROWID;
 
 DROP INDEX IF EXISTS blocks.BlocksGeneration;
+DROP INDEX IF EXISTS blocks.BlocksFS;
 DROP INDEX IF EXISTS refs.RefsChildGeneration;
+DROP INDEX IF EXISTS refs.RefsTree;

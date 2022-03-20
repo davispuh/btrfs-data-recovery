@@ -13,6 +13,7 @@ import std.exception : ErrnoException;
 import std.concurrency : Tid, setMaxMailboxSize, spawnLinked,
                          send, prioritySend, receiveTimeout, LinkTerminated,
                          thisTid, OnCrowding;
+import std.typecons : Nullable;
 import core.time : Duration;
 import core.sys.posix.signal : sigaction, sigaction_t, SIGINT, SIGSEGV, SIGTERM, SIGHUP, SIGBUS, SA_RESTART, SA_RESETHAND;
 import core.stdc.stdlib : exit;
@@ -122,22 +123,26 @@ void processData(Database db, ref Progress data)
         db.storeSuperblock(data.deviceUuid, data.offset, data.superblock);
     } else if (data.dataType == DataType.Block)
     {
-        auto owner = data.owner;
-        if (owner == ObjectID.INVALID)
-        {
-            owner = data.block.owner;
-        }
-        auto commited = db.storeBlock(data.deviceUuid, data.offset, data.bytenr, data.block.superblock.fsid, owner, data.block);
+        auto commited = db.storeBlock(data.deviceUuid, data.offset, data.bytenr, data.block.superblock.fsid, data.block);
         if (data.tree > 0 || commited)
         {
             data.thread.send(data);
         }
     } else if (data.dataType == DataType.Ref)
     {
-        db.storeRef(data.deviceUuid, data.bytenr, data.refInfo.child, data.refInfo.generation);
+        Nullable!long owner;
+        if (data.owner != ObjectID.INVALID)
+        {
+            owner = data.owner;
+        }
+        db.storeRef(data.deviceUuid, data.bytenr, owner, data.refInfo.child, data.refInfo.generation);
     } else if (data.dataType == DataType.Message)
     {
         registerError(data, data.message.to!string);
+    }
+    if (data.status != Status.STARTED && data.status != Status.WORKING)
+    {
+        db.commit();
     }
 }
 

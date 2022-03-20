@@ -367,7 +367,7 @@ public:
             return this._superblock.chunkRootGeneration;
         }
 
-        return 0;
+        throw new FilesystemException("Not implemented for tree: " ~ tree.to!string);
     }
 
     ref shared(Device) addDevice(const ubyte[UUID_SIZE] deviceUUID, shared Device device)

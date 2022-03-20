@@ -58,8 +58,8 @@ struct Progress
         char[200] message;
         struct RefInfo
         {
-            size_t child;
-            size_t generation;
+            ulong child;
+            ulong generation;
         };
         RefInfo refInfo;
     }
@@ -337,8 +337,8 @@ public:
 
         if ([this.fs.root, this.fs.chunkRoot].canFind(block))
         {
-            this.progress.bytenr = this.fs.superblock.bytenr;
             this.progress.dataType = DataType.Ref;
+            this.progress.bytenr = this.fs.superblock.bytenr;
             this.progress.refInfo.child = block;
             this.progress.refInfo.generation = (cast(FilesystemState)this.fs).getExpectedGeneration(block);
             ownerTid.send(this.progress);

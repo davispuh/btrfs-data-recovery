@@ -35,8 +35,9 @@ public:
         });
 
         this.refs = db.prepare(q{
-            INSERT OR REPLACE INTO refs (deviceUuid, bytenr, child, childGeneration)
-            VALUES (:deviceUuid, :bytenr, :child, :childGeneration)
+            INSERT OR REPLACE INTO refs (deviceUuid, bytenr, owner, child, childGeneration)
+            VALUES (:deviceUuid, :bytenr, :owner, :child, :childGeneration)
+        });
         });
 
         this.db.begin();
@@ -46,6 +47,7 @@ public:
     {
         this.db.commit();
         db.run(import("indexes.sql"));
+        db.run(import("optimize.sql"));
     }
 
     void clearRefs(const(ubyte[UUID_SIZE])[] deviceUuids)
@@ -64,33 +66,36 @@ public:
         return this.maybeCommit();
     }
 
-    bool storeBlock(ubyte[UUID_SIZE] deviceUuid, size_t offset, ulong bytenr, ubyte[FSID_SIZE] fsid, ObjectID owner, const ref Block block)
+    bool storeBlock(ubyte[UUID_SIZE] deviceUuid, size_t offset, ulong bytenr, ubyte[FSID_SIZE] fsid, const ref Block block)
     {
-        // deviceUuid, offset, isValid, bytenr, generation, fsid, csum, owner, nritems, level)
+        // deviceUuid, offset, isValid, bytenr, generation, fsid, csum, owner, nritems, level
         this.block.inject(deviceUuid, offset, block.isValid(),
                           cast(long)bytenr, cast(long)block.generation, fsid,
-                          block.csum, owner, block.nritems, block.level);
+                          block.csum, block.owner, block.nritems, block.level);
 
         return this.maybeCommit();
     }
 
-    bool storeRef(ubyte[UUID_SIZE] deviceUuid, ulong bytenr, ulong child, ulong generation)
+    bool storeRef(ubyte[UUID_SIZE] deviceUuid, ulong bytenr, Nullable!long owner, ulong child, ulong generation)
     {
-        // deviceUuid, bytenr, child, childGeneration
-        long childGeneration;
+        Nullable!long childGeneration;
         if (generation <= long.max)
         {
             childGeneration = generation;
-        } else
-        {
-            childGeneration = -1;
         }
         if (child <= long.max) // ignore too large child bytenr
         {
-            this.refs.inject(deviceUuid, bytenr, child, childGeneration);
+            // deviceUuid, bytenr, child, childGeneration
+            this.refs.inject(deviceUuid, bytenr, owner, child, childGeneration);
             return this.maybeCommit();
         }
         return false;
+    }
+
+    void commit()
+    {
+        this.db.commit();
+        this.db.begin();
     }
 
     bool maybeCommit()
@@ -98,8 +103,7 @@ public:
         this.count++;
         if (this.count >= commitOn)
         {
-            this.db.commit();
-            this.db.begin();
+            this.commit();
             this.count = 0;
             return true;
         }
