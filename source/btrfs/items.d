@@ -3,8 +3,13 @@ module btrfs.items;
 import std.stdint : uint8_t, uint16_t, uint32_t, int64_t, uint64_t;
 import std.typecons : BitFlags;
 import std.bitmanip : nativeToLittleEndian;
-import btrfs.header : UUID_SIZE;
+import btrfs.header : UUID_SIZE, HeaderData;
+import btrfs.block : TYPICAL_BLOCK_SIZE;
 import btrfs.utils : littleEndianToNative;
+
+
+const KEY_SIZE = 17;
+const MAX_ITEMS = (TYPICAL_BLOCK_SIZE - HeaderData.sizeof) / (KEY_SIZE + 8 + 24);
 
 enum ItemType : uint8_t
 {
@@ -185,6 +190,85 @@ struct RootItem
 
 }
 
+enum ExtentType : uint8_t
+{
+    EXTENT_INLINE    = 0,
+    EXTENT_REG       = 1,
+    EXTENT_PREALLOC  = 2,
+    EXTENT_MAX_TYPES = 3
+}
+
+enum CompressionType : uint8_t
+{
+    COMPRESSION_NONE = 0,
+    COMPRESSION_ZLIB = 1,
+    COMPRESSION_LZO  = 2,
+    COMPRESSION_ZSTD = 3
+}
+
+enum EncryptionType : uint8_t
+{
+    ENCRYPTION_NONE = 0
+}
+
+enum EncodingType : uint16_t
+{
+    ENCODING_NONE = 0
+}
+
+struct ExtentDataItem
+{
+    align(1):
+
+    ubyte[8] _generation;
+    ubyte[8] _size;
+    CompressionType compression;
+    EncryptionType encryption;
+    EncodingType encoding;
+    ExtentType type;
+
+    @property @nogc const(uint64_t) generation() const pure nothrow
+    {
+        return littleEndianToNative!(uint64_t)(this._generation);
+    }
+
+    @property @nogc const(uint64_t) size() const pure nothrow
+    {
+        return littleEndianToNative!(uint64_t)(this._size);
+    }
+
+    union
+    {
+        ubyte[32] data;
+        struct
+        {
+            ubyte[8] _diskBytenr;
+            ubyte[8] _diskBytes;
+            ubyte[8] _offset;
+            ubyte[8] _bytes;
+
+            @property @nogc const(uint64_t) diskBytenr() const pure nothrow
+            {
+                return littleEndianToNative!(uint64_t)(this._diskBytenr);
+            }
+
+            @property @nogc const(uint64_t) diskBytes() const pure nothrow
+            {
+                return littleEndianToNative!(uint64_t)(this._diskBytes);
+            }
+
+            @property @nogc const(uint64_t) offset() const pure nothrow
+            {
+                return littleEndianToNative!(uint64_t)(this._offset);
+            }
+
+            @property @nogc const(uint64_t) bytes() const pure nothrow
+            {
+                return littleEndianToNative!(uint64_t)(this._bytes);
+            }
+        }
+    }
+}
 
 struct StripeItem
 {

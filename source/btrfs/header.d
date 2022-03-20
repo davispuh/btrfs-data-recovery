@@ -6,6 +6,8 @@ import btrfs.checksum : CSUM_SIZE;
 const FSID_SIZE = 16;
 const UUID_SIZE = 16;
 
+const MIN_SUBVOLUME_ID = 256;
+
 struct HeaderData
 {
     align(1):

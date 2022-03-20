@@ -7,6 +7,7 @@ public import d2sqlite3 : SqliteException;
 import btrfs.header : UUID_SIZE, FSID_SIZE, ObjectID;
 import btrfs.superblock : Superblock;
 import btrfs.block : Block;
+import btrfs.items : Key;
 
 class Database
 {
@@ -15,6 +16,7 @@ private:
     Statement superblock;
     Statement block;
     Statement refs;
+    Statement keys;
     ulong count = 0;
     const commitOn = 20000;
 public:
@@ -38,6 +40,10 @@ public:
             INSERT OR REPLACE INTO refs (deviceUuid, bytenr, owner, child, childGeneration)
             VALUES (:deviceUuid, :bytenr, :owner, :child, :childGeneration)
         });
+
+        this.keys = db.prepare(q{
+            INSERT OR REPLACE INTO keys (deviceUuid, bytenr, objectid, type, offset, data)
+            VALUES (:deviceUuid, :bytenr, :objectid, :type, :offset, :data)
         });
 
         this.db.begin();
@@ -53,6 +59,11 @@ public:
     void clearRefs(const(ubyte[UUID_SIZE])[] deviceUuids)
     {
         db.execute("DELETE FROM refs WHERE deviceUuid IN (:uuids)", deviceUuids);
+    }
+
+    void clearKeys(const(ubyte[UUID_SIZE])[] deviceUuids)
+    {
+        db.execute("DELETE FROM keys WHERE deviceUuid IN (:uuids)", deviceUuids);
     }
 
     bool storeSuperblock(ubyte[UUID_SIZE] deviceUuid, size_t offset, const ref Superblock superblock)
@@ -90,6 +101,18 @@ public:
             return this.maybeCommit();
         }
         return false;
+    }
+
+    void storeKeys(ubyte[UUID_SIZE] deviceUuid, ulong bytenr, const ref Key key, Nullable!long data)
+    {
+        // can't store bigger values, for now just ignore them
+        if (key.objectid <= long.max &&
+            key.type <= long.max &&
+            key.offset <= long.max)
+        {
+            // deviceUuid, bytenr, objectid, type, offset
+            this.keys.inject(deviceUuid, cast(long)bytenr, key.objectid, key.type, key.offset, data);
+        }
     }
 
     void commit()

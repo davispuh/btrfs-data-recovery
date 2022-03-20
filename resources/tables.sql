@@ -42,7 +42,20 @@ CREATE TABLE IF NOT EXISTS refs(
     PRIMARY KEY (deviceUuid, bytenr, child)
 ) WITHOUT ROWID;
 
+
+CREATE TABLE IF NOT EXISTS keys(
+    deviceUuid BLOB(16) NOT NULL,
+    bytenr INTEGER NOT NULL,
+    objectid INTEGER NOT NULL,
+    type INTEGER NOT NULL,
+    offset INTEGER NOT NULL,
+    data INTEGER NULL,
+    PRIMARY KEY (deviceUuid, type, offset, objectid, bytenr)
+) WITHOUT ROWID;
+
+
 DROP INDEX IF EXISTS blocks.BlocksGeneration;
 DROP INDEX IF EXISTS blocks.BlocksFS;
 DROP INDEX IF EXISTS refs.RefsChildGeneration;
 DROP INDEX IF EXISTS refs.RefsTree;
+DROP INDEX IF EXISTS keys.KeysData;

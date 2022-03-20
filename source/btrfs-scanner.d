@@ -4,7 +4,7 @@ import std.stdio : stderr;
 import std.getopt : getopt, config, defaultGetoptPrinter;
 import std.conv : to;
 import std.format : format;
-import std.algorithm.searching : maxElement, countUntil, canFind, any;
+import std.algorithm.searching : minElement, maxElement, countUntil, canFind, any;
 import std.algorithm.sorting : sort;
 import std.algorithm.iteration : uniq, map, reduce;
 import std.algorithm.setops : setDifference;
@@ -21,12 +21,14 @@ import ui.multiBar : MultiBar, PositionalBar, BarStatus;
 import btrfs.scanner : Progress, Status, DataType, Scanner;
 import btrfs.database : Database, SqliteException;
 import btrfs.fs : FilesystemState, FilesystemException, Tree;
-import btrfs.header : FSID_SIZE, UUID_SIZE, ObjectID;
+import btrfs.header : FSID_SIZE, UUID_SIZE, ObjectID, MIN_SUBVOLUME_ID;
+import btrfs.items : MAX_ITEMS, ItemType, ExtentType;
 
 const maxMailBoxSize = 100000;
 bool isAborting = false;
 bool shouldAbort = false;
 string[] errors;
+bool storeItemKeys = false;
 
 
 void registerError(string device, string message)
@@ -124,6 +126,30 @@ void processData(Database db, ref Progress data)
     } else if (data.dataType == DataType.Block)
     {
         auto commited = db.storeBlock(data.deviceUuid, data.offset, data.bytenr, data.block.superblock.fsid, data.block);
+        if (storeItemKeys && (data.owner == ObjectID.ROOT_TREE ||
+             data.owner == ObjectID.FS_TREE ||
+             data.owner >= MIN_SUBVOLUME_ID) && data.block.isLeaf())
+        {
+            auto itemCount = [data.block.nritems, MAX_ITEMS].minElement;
+            for (int i = 0; i < itemCount; i++)
+            {
+                auto item = data.block.data.leafItems[i];
+                Nullable!long keyData;
+                if (item.key.type == ItemType.EXTENT_DATA)
+                {
+                    auto itemData = data.block.getExtentDataItem(item.offset, item.size);
+                    if (itemData.type != ExtentType.EXTENT_INLINE)
+                    {
+                        keyData = itemData.diskBytenr;
+                    }
+                }
+                db.storeKeys(data.deviceUuid, data.bytenr, item.key, keyData);
+            }
+            if (commited)
+            {
+                db.commit();
+            }
+        }
         if (data.tree > 0 || commited)
         {
             data.thread.send(data);
@@ -360,7 +386,8 @@ int main(string[] args)
     {
         auto optionInfo = getopt(args, config.required, "database|d", "Path to database for results", &databasePath,
                                  "block|b", "Block number to start", &blocks,
-                                 "tree|t", "Tree to scan (all, root, chunk, log)", &tree);
+                                 "tree|t", "Tree to scan (all, root, chunk, log)", &tree,
+                                 "store-keys|k", "Store item keys (can be useful to repair extent tree)", &storeItemKeys);
 
         if (optionInfo.helpWanted)
         {
@@ -408,6 +435,10 @@ int main(string[] args)
                 deviceUUIDs ~= fs.getAllDeviceUUIDs();
             }
             db.clearRefs(deviceUUIDs);
+            if (storeItemKeys)
+            {
+                db.clearKeys(deviceUUIDs);
+            }
         }
         if (!scanBlocks(filesystemStates, blocks, tree, scannerThreads))
         {

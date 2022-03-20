@@ -3,7 +3,7 @@ module btrfs.block;
 import btrfs.io : loadable;
 import btrfs.utils : createGetters, getterMixin, isScalarType, isArray, littleEndianToNative;
 import btrfs.header : HeaderData;
-import btrfs.items : NodeItem, LeafItem, RootItem, ChunkItem;
+import btrfs.items : NodeItem, LeafItem, RootItem, ChunkItem, ExtentDataItem;
 import btrfs.superblock : Superblock;
 import btrfs.checksum : calculateChecksum;
 
@@ -104,6 +104,11 @@ struct Block
     @nogc ref const(ChunkItem) getChunkItem(size_t offset, size_t size) const pure nothrow return
     {
         return *cast(ChunkItem *)(this.buffer - this.offset + HeaderData.sizeof + offset);
+    }
+
+    @nogc const(ExtentDataItem *) getExtentDataItem(size_t offset, size_t size) const pure nothrow return
+    {
+        return cast(ExtentDataItem *)(this.buffer - this.offset + HeaderData.sizeof + offset);
     }
 
     @property @nogc ref const(Superblock) superblock() const pure nothrow return
