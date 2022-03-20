@@ -375,7 +375,6 @@ int main(string[] args)
     }
 
     Database db;
-    scope(exit) db.destroy;
 
     try
     {
@@ -415,8 +414,16 @@ int main(string[] args)
     }
 
     processUpdates(db, scannerThreads);
-
     stderr.writeln();
+
+    try
+    {
+        db.destroy;
+    } catch (Exception e)
+    {
+        stderr.writeln(e.msg);
+    }
+
     if (printErrors())
     {
         stderr.writeln("Partial data saved to " ~ databasePath);
