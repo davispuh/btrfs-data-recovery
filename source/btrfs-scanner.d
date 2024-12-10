@@ -452,6 +452,8 @@ int main(string[] args)
     processUpdates(db, scannerThreads);
     stderr.writeln();
 
+    stderr.writeln("Saving database and creating indexes...");
+
     try
     {
         db.destroy;
