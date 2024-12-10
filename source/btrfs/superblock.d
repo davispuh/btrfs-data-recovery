@@ -206,11 +206,6 @@ bool loadSuperblock(ref Superblock superblock, shared const void[] buffer) // no
             {
                 return false;
             }
-
-            if (superblock.csumType == ChecksumType.XXHASH)
-            {
-                throw new Exception("xxhash (64-bit) is not implemented!");
-            }
             return superblock.isValid();
         }
     }

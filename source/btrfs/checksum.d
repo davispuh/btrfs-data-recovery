@@ -4,8 +4,8 @@ import std.bitmanip : nativeToLittleEndian;
 import std.digest : digest;
 import std.digest.crc : CRC;
 import std.digest.sha : sha256Of;
-import xxhash : xxhashOf;
 import crypto.blake2.blake2b : blake2b, B256;
+import utils.xxhash64 : xxhash64Of;
 
 const CSUM_SIZE = 32;
 
@@ -29,11 +29,9 @@ const(ubyte[CSUM_SIZE]) calculateChecksum(const ubyte[] data, const ChecksumType
             result[0..value.sizeof] = value;
             break;
         case ChecksumType.XXHASH:
-            // We're missing xxhash64 implementation, xxhashOf is only 32-bit so this isn't correct
-            // TODO: Get xxhash64 implementation
-            auto value = nativeToLittleEndian(xxhashOf(data));
+            auto value = nativeToLittleEndian(xxhash64Of(data));
             result[0..value.sizeof] = value;
-            assert(0); // break;
+            break;
         case ChecksumType.SHA256:
             result = sha256Of(data);
             break;
