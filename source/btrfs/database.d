@@ -17,6 +17,7 @@ private:
     Statement block;
     Statement refs;
     Statement keys;
+    Statement corruptBranches;
     ulong count = 0;
     const commitOn = 20000;
 public:
@@ -37,13 +38,18 @@ public:
         });
 
         this.refs = db.prepare(q{
-            INSERT OR REPLACE INTO refs (deviceUuid, bytenr, owner, child, childGeneration)
-            VALUES (:deviceUuid, :bytenr, :owner, :child, :childGeneration)
+            INSERT OR REPLACE INTO refs (deviceUuid, bytenr, owner, child, childGeneration, objectId, type, offset)
+            VALUES (:deviceUuid, :bytenr, :owner, :child, :childGeneration, :objectId, :type, :offset)
         });
 
         this.keys = db.prepare(q{
             INSERT OR REPLACE INTO keys (deviceUuid, bytenr, objectid, type, offset, data)
             VALUES (:deviceUuid, :bytenr, :objectid, :type, :offset, :data)
+        });
+
+        this.corruptBranches = db.prepare(q{
+            INSERT OR REPLACE INTO corruptBranches (deviceUuid, bytenr, child, objectid, type, offset)
+            VALUES (:deviceUuid, :bytenr, :child, :objectid, :type, :offset)
         });
 
         this.db.begin();
@@ -87,17 +93,37 @@ public:
         return this.maybeCommit();
     }
 
-    bool storeRef(ubyte[UUID_SIZE] deviceUuid, ulong bytenr, Nullable!long owner, ulong child, ulong generation)
+    bool storeRef(ubyte[UUID_SIZE] deviceUuid, ulong bytenr, Nullable!long owner, ulong child, ulong generation, const ref Key key)
     {
         Nullable!long childGeneration;
+        Nullable!long objectid;
+        Nullable!long type;
+        Nullable!long offset;
         if (generation <= long.max)
         {
             childGeneration = generation;
         }
+        if (key.objectid != 0 &&
+            key.type != 0 &&
+            key.offset != 0)
+        {
+            if (key.objectid <= long.max)
+            {
+                objectid = key.objectid;
+            }
+            if (key.type <= long.max)
+            {
+                type = key.type;
+            }
+            if (key.offset <= long.max)
+            {
+                offset = key.offset;
+            }
+        }
         if (child <= long.max) // ignore too large child bytenr
         {
             // deviceUuid, bytenr, child, childGeneration
-            this.refs.inject(deviceUuid, bytenr, owner, child, childGeneration);
+            this.refs.inject(deviceUuid, bytenr, owner, child, childGeneration, objectid, type, offset);
             return this.maybeCommit();
         }
         return false;
@@ -113,6 +139,36 @@ public:
             // deviceUuid, bytenr, objectid, type, offset
             this.keys.inject(deviceUuid, cast(long)bytenr, key.objectid, key.type, key.offset, data);
         }
+    }
+
+    void storeBranch(ubyte[UUID_SIZE] deviceUuid, ulong bytenr, const ref Key key, ulong child)
+    {
+        Nullable!long childBlock;
+        if (child > 0)
+        {
+            childBlock = child;
+        }
+
+        ulong objectid = key.objectid;
+        if (objectid > long.max)
+        {
+            objectid = 0;
+        }
+
+        ulong type = key.type;
+        if (type > long.max)
+        {
+            type = 0;
+        }
+
+        ulong offset = key.offset;
+        if (offset > long.max)
+        {
+            offset = 0;
+        }
+
+        // deviceUuid, bytenr, child, objectid, type, offset
+        this.corruptBranches.inject(deviceUuid, cast(long)bytenr, childBlock, objectid, type, offset);
     }
 
     void commit()

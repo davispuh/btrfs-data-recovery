@@ -13,7 +13,7 @@ import btrfs.device : Device, DeviceException;
 import btrfs.header : UUID_SIZE, ObjectID;
 import btrfs.superblock : Superblock, isSuperblockOffset, loadSuperblock;
 import btrfs.block : Block;
-import btrfs.items : ItemType;
+import btrfs.items : ItemType, Key;
 import btrfs.fs : OffsetInfo, FilesystemState, FilesystemException;
 
 enum Status
@@ -31,6 +31,7 @@ enum DataType
     Superblock,
     Block,
     Ref,
+    Branch,
     Message
 }
 
@@ -58,10 +59,17 @@ struct Progress
         char[200] message;
         struct RefInfo
         {
+            Key key;
             ulong child;
             ulong generation;
         };
+        struct BranchInfo
+        {
+            Key key;
+            ulong child;
+        };
         RefInfo refInfo;
+        BranchInfo branchInfo;
     }
 }
 
@@ -317,7 +325,7 @@ public:
         this.waitForComplete();
     }
 
-    void scanBlock(ulong block, ref bool[ulong][ubyte[UUID_SIZE]] scannedBlocks, bool isFinal = true)
+    void scanBlock(ulong block, ref bool[ulong][ubyte[UUID_SIZE]] scannedBlocks, ref Key[ubyte[UUID_SIZE]][ulong] parentKeys, bool isFinal = true)
     {
         this.progress.dataType = DataType.None;
         this.progress.tree = block;
@@ -341,6 +349,7 @@ public:
             this.progress.bytenr = this.fs.superblock.bytenr;
             this.progress.refInfo.child = block;
             this.progress.refInfo.generation = (cast(FilesystemState)this.fs).getExpectedGeneration(block);
+            this.progress.refInfo.key = Key();
             ownerTid.send(this.progress);
         }
 
@@ -408,6 +417,18 @@ public:
                     {
                         if (block.isNode())
                         {
+                            if (block.nritems > 0 &&
+                                block.bytenr in parentKeys &&
+                                this.progress.deviceUuid in parentKeys[block.bytenr] && // We probably should compare with other devices aswell
+                                parentKeys[block.bytenr][this.progress.deviceUuid] != Key() &&
+                                parentKeys[block.bytenr][this.progress.deviceUuid] != block.data.nodeItems[0].key)
+                            {
+                                this.progress.dataType = DataType.Branch;
+                                this.progress.branchInfo.key = block.data.nodeItems[0].key;
+                                this.progress.branchInfo.child = block.data.nodeItems[0].blockNumber;
+                                ownerTid.send(this.progress);
+                            }
+
                             for (int i=0; i < block.nritems; i++)
                             {
                                 if ((block.data.nodeItems[i].blockNumber % this.masterSuperblock.sectorsize) == 0)
@@ -417,7 +438,10 @@ public:
                                     this.progress.dataType = DataType.Ref;
                                     this.progress.refInfo.child = activeBlock;
                                     this.progress.refInfo.generation = block.data.nodeItems[i].generation;
+                                    this.progress.refInfo.key = block.data.nodeItems[i].key;
                                     ownerTid.send(this.progress);
+
+                                    parentKeys[activeBlock][this.progress.deviceUuid] = block.data.nodeItems[i].key;
 
                                     if (!(activeBlock in processedBlocks))
                                     {
@@ -430,43 +454,59 @@ public:
                                     anyError = true;
                                 }
                             }
-                        } else if (block.owner == ObjectID.ROOT_TREE)
+                        } else /* Leaf */
                         {
-                            for (int i=0; i < block.nritems; i++)
+                            if (block.nritems > 0 &&
+                                block.bytenr in parentKeys &&
+                                this.progress.deviceUuid in parentKeys[block.bytenr] && // We probably should compare with other devices aswell
+                                parentKeys[block.bytenr][this.progress.deviceUuid] != Key() &&
+                                parentKeys[block.bytenr][this.progress.deviceUuid] != block.data.leafItems[0].key)
                             {
-                                auto item = block.data.leafItems[i];
-                                if (item.key.type == ItemType.ROOT_ITEM)
-                                {
-                                    auto data = block.getRootItem(item.offset, item.size);
-                                    if ((data.bytenr % this.masterSuperblock.sectorsize) == 0)
-                                    {
-                                        this.progress.dataType = DataType.Ref;
-                                        this.progress.refInfo.child = data.bytenr;
-                                        this.progress.refInfo.generation = data.generation;
-                                        ownerTid.send(this.progress);
+                                this.progress.dataType = DataType.Branch;
+                                this.progress.branchInfo.key = block.data.leafItems[0].key;
+                                this.progress.branchInfo.child = 0;
+                                ownerTid.send(this.progress);
+                            }
 
-                                        if (!(data.bytenr in processedBlocks))
-                                        {
-                                            processedBlocks[data.bytenr] = true;
-                                            blocks ~= [data.bytenr, item.key.objectid];
-                                            this.progress.count++;
-                                        }
-                                    } else
+                            if (block.owner == ObjectID.ROOT_TREE)
+                            {
+                                for (int i=0; i < block.nritems; i++)
+                                {
+                                    auto item = block.data.leafItems[i];
+                                    if (item.key.type == ItemType.ROOT_ITEM)
                                     {
-                                        anyError = true;
+                                        auto data = block.getRootItem(item.offset, item.size);
+                                        if ((data.bytenr % this.masterSuperblock.sectorsize) == 0)
+                                        {
+                                            this.progress.dataType = DataType.Ref;
+                                            this.progress.refInfo.child = data.bytenr;
+                                            this.progress.refInfo.generation = data.generation;
+                                            this.progress.refInfo.key = Key();
+                                            ownerTid.send(this.progress);
+
+                                            if (!(data.bytenr in processedBlocks))
+                                            {
+                                                processedBlocks[data.bytenr] = true;
+                                                blocks ~= [data.bytenr, item.key.objectid];
+                                                this.progress.count++;
+                                            }
+                                        } else
+                                        {
+                                            anyError = true;
+                                        }
                                     }
                                 }
-                            }
-                        }/* else if ([ObjectID.FS_TREE,
-                                    ObjectID.EXTENT_TREE,
-                                    ObjectID.CSUM_TREE,
-                                    ObjectID.CHUNK_TREE,
-                                    ObjectID.DEV_TREE,
-                                    ObjectID.UUID_TREE,
-                                    ObjectID.DATA_RELOC_TREE_OBJECTID].canFind(block.owner))
-                        {
-                            // nothing useful for us here
-                        }*/
+                            }/* else if ([ObjectID.FS_TREE,
+                                          ObjectID.EXTENT_TREE,
+                                          ObjectID.CSUM_TREE,
+                                          ObjectID.CHUNK_TREE,
+                                          ObjectID.DEV_TREE,
+                                          ObjectID.UUID_TREE,
+                                          ObjectID.DATA_RELOC_TREE_OBJECTID].canFind(block.owner))
+                            {
+                                // nothing useful for us here
+                            }*/
+                        }
                     } else
                     {
                         anyError = true;
@@ -585,10 +625,11 @@ public:
         handleException(label, ()
         {
             bool[ulong][ubyte[UUID_SIZE]] scannedBlocks;
+            Key[ubyte[UUID_SIZE]][ulong] parentKeys;
             auto scanner = new Scanner(fs);
             foreach (i, block; blocks)
             {
-                scanner.scanBlock(block, scannedBlocks, (i + 1) == blocks.length);
+                scanner.scanBlock(block, scannedBlocks, parentKeys, (i + 1) == blocks.length);
             }
         });
     }

@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS refs(
     owner INTEGER NULL,
     child INTEGER NOT NULL,
     childGeneration INTEGER NULL,
+    objectid INTEGER NULL,
+    type INTEGER NULL,
+    offset INTEGER NULL,
     PRIMARY KEY (deviceUuid, bytenr, child)
 ) WITHOUT ROWID;
 
@@ -53,6 +56,15 @@ CREATE TABLE IF NOT EXISTS keys(
     PRIMARY KEY (deviceUuid, type, offset, objectid, bytenr)
 ) WITHOUT ROWID;
 
+CREATE TABLE IF NOT EXISTS corruptBranches(
+    deviceUuid BLOB(16) NOT NULL,
+    bytenr INTEGER NOT NULL,
+    child INTEGER NULL,
+    objectid INTEGER NOT NULL,
+    type INTEGER NOT NULL,
+    offset INTEGER NOT NULL,
+    PRIMARY KEY (deviceUuid, bytenr)
+) WITHOUT ROWID;
 
 DROP INDEX IF EXISTS blocks.BlocksGeneration;
 DROP INDEX IF EXISTS blocks.BlocksFS;

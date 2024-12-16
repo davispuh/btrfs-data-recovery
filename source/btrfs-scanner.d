@@ -161,7 +161,10 @@ void processData(Database db, ref Progress data)
         {
             owner = data.owner;
         }
-        db.storeRef(data.deviceUuid, data.bytenr, owner, data.refInfo.child, data.refInfo.generation);
+        db.storeRef(data.deviceUuid, data.bytenr, owner, data.refInfo.child, data.refInfo.generation, data.refInfo.key);
+    } else if (data.dataType == DataType.Branch)
+    {
+        db.storeBranch(data.deviceUuid, data.bytenr, data.branchInfo.key, data.branchInfo.child);
     } else if (data.dataType == DataType.Message)
     {
         registerError(data, data.message.to!string);
