@@ -83,17 +83,17 @@ struct Block
 
     @nogc const bool isLeaf() pure nothrow return
     {
-        return this.rawData.header.isLeaf();
+        return (cast(HeaderData *)this.buffer).isLeaf();
     }
 
     @nogc const bool isNode() pure nothrow return
     {
-        return this.rawData.header.isNode();
+        return (cast(HeaderData *)this.buffer).isNode();
     }
 
     @property @nogc ref const(BlockData) data() const pure nothrow return
     {
-        return *(this.rawData - this.offset);
+        return *cast(BlockData *)(this.buffer - this.offset);
     }
 
     @nogc ref const(RootItem) getRootItem(size_t offset, size_t size) const pure nothrow return
@@ -118,11 +118,6 @@ struct Block
 
 private:
     ulong offset = 0;
-    union
-    {
-        immutable(ubyte) *buffer;
-        immutable(BlockData) *rawData;
-    }
-
+    immutable(ubyte) *buffer;
     Superblock _superblock;
 }
