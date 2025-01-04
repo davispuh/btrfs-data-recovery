@@ -417,95 +417,10 @@ public:
                     {
                         if (block.isNode())
                         {
-                            if (block.nritems > 0 &&
-                                block.bytenr in parentKeys &&
-                                this.progress.deviceUuid in parentKeys[block.bytenr] && // We probably should compare with other devices aswell
-                                parentKeys[block.bytenr][this.progress.deviceUuid] != Key() &&
-                                parentKeys[block.bytenr][this.progress.deviceUuid] != block.data.nodeItems[0].key)
-                            {
-                                this.progress.dataType = DataType.Branch;
-                                this.progress.branchInfo.key = block.data.nodeItems[0].key;
-                                this.progress.branchInfo.child = block.data.nodeItems[0].blockNumber;
-                                ownerTid.send(this.progress);
-                            }
-
-                            for (int i=0; i < block.nritems; i++)
-                            {
-                                if ((block.data.nodeItems[i].blockNumber % this.masterSuperblock.sectorsize) == 0)
-                                {
-                                    auto activeBlock = block.data.nodeItems[i].blockNumber;
-
-                                    this.progress.dataType = DataType.Ref;
-                                    this.progress.refInfo.child = activeBlock;
-                                    this.progress.refInfo.generation = block.data.nodeItems[i].generation;
-                                    this.progress.refInfo.key = block.data.nodeItems[i].key;
-                                    ownerTid.send(this.progress);
-
-                                    parentKeys[activeBlock][this.progress.deviceUuid] = block.data.nodeItems[i].key;
-
-                                    if (!(activeBlock in processedBlocks))
-                                    {
-                                        processedBlocks[activeBlock] = true;
-                                        blocks ~= [activeBlock, this.progress.owner];
-                                        this.progress.count++;
-                                    }
-                                } else
-                                {
-                                    anyError = true;
-                                }
-                            }
+                            anyError = this.handleNode(block, blocks, processedBlocks, parentKeys) || anyError;
                         } else /* Leaf */
                         {
-                            if (block.nritems > 0 &&
-                                block.bytenr in parentKeys &&
-                                this.progress.deviceUuid in parentKeys[block.bytenr] && // We probably should compare with other devices aswell
-                                parentKeys[block.bytenr][this.progress.deviceUuid] != Key() &&
-                                parentKeys[block.bytenr][this.progress.deviceUuid] != block.data.leafItems[0].key)
-                            {
-                                this.progress.dataType = DataType.Branch;
-                                this.progress.branchInfo.key = block.data.leafItems[0].key;
-                                this.progress.branchInfo.child = 0;
-                                ownerTid.send(this.progress);
-                            }
-
-                            if (block.owner == ObjectID.ROOT_TREE)
-                            {
-                                for (int i=0; i < block.nritems; i++)
-                                {
-                                    auto item = block.data.leafItems[i];
-                                    if (item.key.type == ItemType.ROOT_ITEM)
-                                    {
-                                        auto data = block.getRootItem(item.offset, item.size);
-                                        if ((data.bytenr % this.masterSuperblock.sectorsize) == 0)
-                                        {
-                                            this.progress.dataType = DataType.Ref;
-                                            this.progress.refInfo.child = data.bytenr;
-                                            this.progress.refInfo.generation = data.generation;
-                                            this.progress.refInfo.key = Key();
-                                            ownerTid.send(this.progress);
-
-                                            if (!(data.bytenr in processedBlocks))
-                                            {
-                                                processedBlocks[data.bytenr] = true;
-                                                blocks ~= [data.bytenr, item.key.objectid];
-                                                this.progress.count++;
-                                            }
-                                        } else
-                                        {
-                                            anyError = true;
-                                        }
-                                    }
-                                }
-                            }/* else if ([ObjectID.FS_TREE,
-                                          ObjectID.EXTENT_TREE,
-                                          ObjectID.CSUM_TREE,
-                                          ObjectID.CHUNK_TREE,
-                                          ObjectID.DEV_TREE,
-                                          ObjectID.UUID_TREE,
-                                          ObjectID.DATA_RELOC_TREE_OBJECTID].canFind(block.owner))
-                            {
-                                // nothing useful for us here
-                            }*/
+                            anyError = this.handleLeaf(block, blocks, processedBlocks, parentKeys) || anyError;
                         }
                     } else
                     {
@@ -556,6 +471,108 @@ public:
         {
             this.waitForComplete();
         }
+    }
+
+    bool handleNode(const ref Block block, ref DList!(ulong[]) blocks, ref bool[ulong] processedBlocks, ref Key[ubyte[UUID_SIZE]][ulong] parentKeys)
+    {
+        bool anyError = false;
+
+        if (block.nritems > 0 &&
+            block.bytenr in parentKeys &&
+            this.progress.deviceUuid in parentKeys[block.bytenr] && // We probably should compare with other devices aswell
+            parentKeys[block.bytenr][this.progress.deviceUuid] != Key() &&
+            parentKeys[block.bytenr][this.progress.deviceUuid] != block.data.nodeItems[0].key)
+        {
+            this.progress.dataType = DataType.Branch;
+            this.progress.branchInfo.key = block.data.nodeItems[0].key;
+            this.progress.branchInfo.child = block.data.nodeItems[0].blockNumber;
+            ownerTid.send(this.progress);
+        }
+
+        for (int i=0; i < block.nritems; i++)
+        {
+            if ((block.data.nodeItems[i].blockNumber % this.masterSuperblock.sectorsize) == 0)
+            {
+                auto activeBlock = block.data.nodeItems[i].blockNumber;
+
+                this.progress.dataType = DataType.Ref;
+                this.progress.refInfo.child = activeBlock;
+                this.progress.refInfo.generation = block.data.nodeItems[i].generation;
+                this.progress.refInfo.key = block.data.nodeItems[i].key;
+                ownerTid.send(this.progress);
+
+                parentKeys[activeBlock][this.progress.deviceUuid] = block.data.nodeItems[i].key;
+
+                if (!(activeBlock in processedBlocks))
+                {
+                    processedBlocks[activeBlock] = true;
+                    blocks ~= [activeBlock, this.progress.owner];
+                    this.progress.count++;
+                }
+            } else
+            {
+                anyError = true;
+            }
+        }
+        return anyError;
+    }
+
+    bool handleLeaf(const ref Block block, ref DList!(ulong[]) blocks, ref bool[ulong] processedBlocks, ref Key[ubyte[UUID_SIZE]][ulong] parentKeys)
+    {
+        bool anyError = false;
+
+        if (block.nritems > 0 &&
+            block.bytenr in parentKeys &&
+            this.progress.deviceUuid in parentKeys[block.bytenr] && // We probably should compare with other devices aswell
+            parentKeys[block.bytenr][this.progress.deviceUuid] != Key() &&
+            parentKeys[block.bytenr][this.progress.deviceUuid] != block.data.leafItems[0].key)
+        {
+            this.progress.dataType = DataType.Branch;
+            this.progress.branchInfo.key = block.data.leafItems[0].key;
+            this.progress.branchInfo.child = 0;
+            ownerTid.send(this.progress);
+        }
+
+        if (block.owner == ObjectID.ROOT_TREE)
+        {
+            for (int i=0; i < block.nritems; i++)
+            {
+                auto item = block.data.leafItems[i];
+                if (item.key.type == ItemType.ROOT_ITEM)
+                {
+                    auto data = block.getRootItem(item.offset, item.size);
+                    if ((data.bytenr % this.masterSuperblock.sectorsize) == 0)
+                    {
+                        this.progress.dataType = DataType.Ref;
+                        this.progress.refInfo.child = data.bytenr;
+                        this.progress.refInfo.generation = data.generation;
+                        this.progress.refInfo.key = Key();
+                        ownerTid.send(this.progress);
+
+                        if (!(data.bytenr in processedBlocks))
+                        {
+                            processedBlocks[data.bytenr] = true;
+                            blocks ~= [data.bytenr, item.key.objectid];
+                            this.progress.count++;
+                        }
+                    } else
+                    {
+                        anyError = true;
+                    }
+                }
+            }
+        }/* else if ([ObjectID.FS_TREE,
+                      ObjectID.EXTENT_TREE,
+                      ObjectID.CSUM_TREE,
+                      ObjectID.CHUNK_TREE,
+                      ObjectID.DEV_TREE,
+                      ObjectID.UUID_TREE,
+                      ObjectID.DATA_RELOC_TREE_OBJECTID].canFind(block.owner))
+        {
+            // nothing useful for us here
+        }*/
+
+        return anyError;
     }
 
     static void setProgressError(ref Progress progress, string message)
