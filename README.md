@@ -80,6 +80,23 @@ $ sqlite3 blocks.db 'SELECT COUNT(DISTINCT blocks.bytenr) FROM blocks
 77
 ```
 
+`btrfs-fixer.rb` is a program that can fix corrupted BTRFS blocks
+
+```
+Usage: btrfs-fixer.rb [options] <devices...>
+    -d, --database DB                Path to database for automatic repair
+    -t, --tree TREE                  Limit repair to specified tree (root, extent, chunk, dev, fs, csum, uuid)
+    -c, --copy PATH                  Path where to copy block backup (default: ./backup/)
+    -s, --superblock FILE            Path to superblock
+    -b, --blocks IDs                 Block numbers
+    -o, --output FILE                File where to write fixed block
+        --[no-]repair                Repair
+    -p, --[no-]print                 Print full info
+    -q, --[no-]quiet                 Don't output info
+    -x                               Swap first 1024 bytes
+    -h, --help                       Show this message
+```
+
 Check how the filesystem repair would go
 
 ```
