@@ -4,6 +4,20 @@ Tools for data recovery when using BTRFS.
 
 It allows to repair corrupted BTRFS to minimize data loss.
 
+## Installation
+
+On Arch Linux you can simply install [btrfs-data-recovery-git](https://aur.archlinux.org/packages/btrfs-data-recovery-git) from AUR.
+
+Otherwise install [LDC](https://wiki.dlang.org/LDC) (best performance), [DUB](https://github.com/dlang/dub) and [Ruby](https://www.ruby-lang.org/en/)
+
+Then follow these steps:
+```
+$ git clone https://github.com/davispuh/btrfs-data-recovery.git
+$ cd btrfs-data-recovery
+$ dub build --build=release --compiler=ldc
+$ bundle install
+```
+
 ## Usage
 
 `btrfs-scanner` is a program to collect info about BTRFS blocks in a database (SQLite).
