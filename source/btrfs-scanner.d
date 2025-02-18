@@ -459,7 +459,7 @@ int main(string[] args)
 
     try
     {
-        db.destroy;
+        db.save();
     } catch (Exception e)
     {
         stderr.writeln(e.msg);

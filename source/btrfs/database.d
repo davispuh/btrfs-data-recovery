@@ -55,7 +55,7 @@ public:
         this.db.begin();
     }
 
-    ~this()
+    void save()
     {
         this.db.commit();
         db.run(import("indexes.sql"));
