@@ -445,6 +445,13 @@ int main(string[] args)
         }
         if (!scanBlocks(filesystemStates, blocks, tree, scannerThreads))
         {
+            try
+            {
+                db.destroy;
+            } catch (Exception e)
+            {
+                stderr.writeln(e.msg);
+            }
             return -3;
         }
     } else
