@@ -4,8 +4,16 @@ import std.bitmanip : nativeToLittleEndian;
 import std.digest : digest;
 import std.digest.crc : CRC;
 import std.digest.sha : sha256Of;
-import crypto.blake2.blake2b : blake2b, B256;
 import utils.xxhash64 : xxhash64Of;
+
+version (AArch64)
+{
+    pragma(msg, "BLAKE2 checksum support is not implemented! Program will abort when required!");
+    import core.stdc.stdlib : abort;
+} else
+{
+    import crypto.blake2.blake2b : blake2b, B256;
+}
 
 const CSUM_SIZE = 32;
 
@@ -36,8 +44,14 @@ const(ubyte[CSUM_SIZE]) calculateChecksum(const ubyte[] data, const ChecksumType
             result = sha256Of(data);
             break;
         case ChecksumType.BLAKE2:
-            blake2b(&result[0], B256, data);
-            break;
+            version (AArch64)
+            {
+                abort();
+            } else
+            {
+                blake2b(&result[0], B256, data);
+                break;
+            }
         default:
             assert(false);
     }
