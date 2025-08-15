@@ -35,7 +35,7 @@ GEM
     sqlite3 (2.5.0-x86_64-darwin)
     sqlite3 (2.5.0-x86_64-linux-gnu)
     sqlite3 (2.5.0-x86_64-linux-musl)
-    xxhash (0.6.0)
+    xxhash (0.7.0)
     yard (0.9.37)
 
 PLATFORMS
