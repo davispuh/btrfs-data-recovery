@@ -101,12 +101,14 @@ private:
             {
                 throw new FilesystemException("Unexpected chunk tree stripes!");
             }
-            shared const(void)[] chunkData;
-            if (!this.loadDeviceData(chunkRootOffset[0].devUuid, chunkData))
+            shared Device device;
+            if (!(chunkRootOffset[0].devUuid in this.devices))
             {
                 continue;
             }
-            this.block.load(chunkData.ptr + chunkRootOffset[0].physical);
+            device = this.devices[chunkRootOffset[0].devUuid];
+            auto devicePtr = device.dataPtr(chunkRootOffset[0].physical, this.nodesize);
+            this.block.load(devicePtr);
             auto block = this.block;
             if (block.isValid())
             {
@@ -241,7 +243,7 @@ public:
             throw new FilesystemException(e.msg);
         }
         this.data = device.data();
-        if (!loadSuperblock(this._superblock, this.data))
+        if (!loadSuperblock(this._superblock, device))
         {
             throw new FilesystemException("Invalid superblock!");
         }

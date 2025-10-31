@@ -74,11 +74,18 @@ public:
 
     bool storeSuperblock(ubyte[UUID_SIZE] deviceUuid, size_t offset, const ref Superblock superblock)
     {
+        // Convert large values to fit in database limits, using local variables
+        long dbBytenr = (superblock.bytenr > long.max) ? 0 : cast(long)superblock.bytenr;
+        long dbGeneration = (superblock.generation > long.max) ? 0 : cast(long)superblock.generation;
+        long dbNumDevices = (superblock.numDevices > long.max) ? 0 : cast(long)superblock.numDevices;
+        long dbRoot = (superblock.root > long.max) ? 0 : cast(long)superblock.root;
+        long dbChunkRoot = (superblock.chunkRoot > long.max) ? 0 : cast(long)superblock.chunkRoot;
+
         // deviceUuid, offset, isValid, label, bytenr, generation, fsid, numDevices, csum, csumType, sectorsize, nodesize, root, chunkRoot
         this.superblock.inject(deviceUuid, offset, superblock.isValid(),
-                               superblock.label.to!string, superblock.bytenr, superblock.generation,
-                               superblock.fsid, superblock.numDevices, superblock.csum, superblock.csumType,
-                               superblock.sectorsize, superblock.nodesize, superblock.root, superblock.chunkRoot);
+                               superblock.label.to!string, dbBytenr, dbGeneration,
+                               superblock.fsid, dbNumDevices, superblock.csum, superblock.csumType,
+                               superblock.sectorsize, superblock.nodesize, dbRoot, dbChunkRoot);
 
         return this.maybeCommit();
     }

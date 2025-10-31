@@ -7,6 +7,7 @@ import btrfs.utils : createGetters, getterMixin, isScalarType, isArray, littleEn
 import btrfs.header : FSID_SIZE, UUID_SIZE;
 import btrfs.checksum : CSUM_SIZE, ChecksumType, calculateChecksum;
 import btrfs.items : Key, Chunk, ChunkItem, StripeItem;
+import btrfs.device : Device;
 
 const SUPERBLOCK_OFFSETS = [0x10000uL, 0x4000000uL, 0x4000000000uL];
 const SUPERBLOCK_SIZE = 0x1000;
@@ -161,8 +162,24 @@ struct Superblock
 
     bool isValid() const nothrow
     {
-        auto checksum = calculateChecksum(this.buffer[typeof(*this.data).csum.sizeof..SUPERBLOCK_SIZE], this.csumType);
-        if (this.csum != checksum) {
+        // Ensure we have enough data for checksum calculation
+        if (this.buffer is null) {
+            return false;
+        }
+
+        auto dataStart = typeof(*this.data).csum.sizeof;
+        auto dataEnd = SUPERBLOCK_SIZE;
+
+        if (dataStart >= dataEnd) {
+            return false;
+        }
+
+        try {
+            auto checksum = calculateChecksum(this.buffer[dataStart..dataEnd], this.csumType);
+            if (this.csum != checksum) {
+                return false;
+            }
+        } catch (Exception e) {
             return false;
         }
 
@@ -207,6 +224,32 @@ bool loadSuperblock(ref Superblock superblock, shared const void[] buffer) // no
                 return false;
             }
             return superblock.isValid();
+        }
+    }
+    return false;
+}
+
+bool loadSuperblock(ref Superblock superblock, ref shared Device device) // nothrow
+{
+    foreach (offset; SUPERBLOCK_OFFSETS)
+    {
+        if (offset + SUPERBLOCK_SIZE < device.size)
+        {
+            try
+            {
+                auto devicePtr = device.dataPtr(offset, SUPERBLOCK_SIZE);
+                superblock.load(devicePtr);
+
+                if (!superblock.matches())
+                {
+                    return false;
+                }
+                return superblock.isValid();
+            }
+            catch (Exception e)
+            {
+                return false;
+            }
         }
     }
     return false;

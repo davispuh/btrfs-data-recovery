@@ -73,7 +73,12 @@ struct Block
         {
             return false;
         }
-        auto checksum = calculateChecksum(this.buffer[typeof(this.data).csum.sizeof..(this.superblock.nodesize  - this.offset)], this.superblock.csumType);
+        auto bufferSize = this.superblock.nodesize - this.offset;
+        if (bufferSize <= typeof(this.data).csum.sizeof)
+        {
+            return false;
+        }
+        auto checksum = calculateChecksum(this.buffer[typeof(this.data).csum.sizeof..bufferSize], this.superblock.csumType);
         if (this.csum != checksum)
         {
             return false;

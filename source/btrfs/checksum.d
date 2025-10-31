@@ -30,18 +30,31 @@ enum ChecksumType : ushort
 const(ubyte[CSUM_SIZE]) calculateChecksum(const ubyte[] data, const ChecksumType checksumType) nothrow
 {
     ubyte[CSUM_SIZE] result;
+    result[] = 0; // Initialize to zero
+
+    // Validate checksum type
+    if (cast(ushort)checksumType > 3) {
+        return result;
+    }
+
     switch (checksumType)
     {
         case ChecksumType.CRC32:
-            auto value = digest!CRC32C(data);
-            result[0..value.sizeof] = value;
+            if (data.length > 0) {
+                auto value = digest!CRC32C(data);
+                result[0..value.sizeof] = value;
+            }
             break;
         case ChecksumType.XXHASH:
-            auto value = nativeToLittleEndian(xxhash64Of(data));
-            result[0..value.sizeof] = value;
+            if (data.length > 0) {
+                auto value = nativeToLittleEndian(xxhash64Of(data));
+                result[0..value.sizeof] = value;
+            }
             break;
         case ChecksumType.SHA256:
-            result = sha256Of(data);
+            if (data.length > 0) {
+                result = sha256Of(data);
+            }
             break;
         case ChecksumType.BLAKE2:
             version (AArch64)
@@ -49,11 +62,14 @@ const(ubyte[CSUM_SIZE]) calculateChecksum(const ubyte[] data, const ChecksumType
                 abort();
             } else
             {
-                blake2b(&result[0], B256, data);
+                if (data.length > 0) {
+                    blake2b(&result[0], B256, data);
+                }
                 break;
             }
         default:
-            assert(false);
+            // Invalid checksum type, return zero result
+            break;
     }
 
     return result;
