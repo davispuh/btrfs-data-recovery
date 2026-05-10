@@ -7,6 +7,7 @@ import btrfs.utils : createGetters, getterMixin, isScalarType, isArray, littleEn
 import btrfs.header : FSID_SIZE, UUID_SIZE;
 import btrfs.checksum : CSUM_SIZE, ChecksumType, calculateChecksum;
 import btrfs.items : Key, Chunk, ChunkItem, StripeItem;
+import btrfs.device : Device;
 
 const SUPERBLOCK_OFFSETS = [0x10000uL, 0x4000000uL, 0x4000000000uL];
 const SUPERBLOCK_SIZE = 0x1000;
@@ -201,6 +202,25 @@ bool loadSuperblock(ref Superblock superblock, shared const void[] buffer) // no
         if (offset + SUPERBLOCK_SIZE < buffer.length)
         {
             superblock.load(buffer.ptr + offset);
+
+            if (!superblock.matches())
+            {
+                return false;
+            }
+            return superblock.isValid();
+        }
+    }
+    return false;
+}
+
+bool loadSuperblock(ref Superblock superblock, ref shared Device device) // nothrow
+{
+    foreach (offset; SUPERBLOCK_OFFSETS)
+    {
+        if (offset + SUPERBLOCK_SIZE < device.size)
+        {
+            auto devicePtr = device.dataPtr(offset, SUPERBLOCK_SIZE);
+            superblock.load(devicePtr);
 
             if (!superblock.matches())
             {

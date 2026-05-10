@@ -111,7 +111,7 @@ private:
         if (fs.hasDevice(deviceUUID))
         {
             this.device = fs.getDevice(deviceUUID);
-            this.data = this.device.data();
+            this.data = this.device[];
             this.progress.deviceUuid = deviceUUID;
             return true;
         }
@@ -120,11 +120,11 @@ private:
 
     bool processBlock(size_t offset, void delegate(const ref Block block) action, bool readInvalid = false)
     {
-        if (offset + this.masterSuperblock.nodesize >= this.data.length)
+        if (offset + this.masterSuperblock.nodesize >= this.device.size)
         {
             return false;
         }
-        return this.block.process(this.data.ptr + offset, action, readInvalid);
+        return this.block.process(this.device.dataPtr(offset, this.masterSuperblock.nodesize), action, readInvalid);
     }
 
     bool checkForMessages()
@@ -236,9 +236,9 @@ public:
         this.progress.device = this.device.path;
         this.progress.size = this.device.size;
         ownerTid.send(this.progress);
-        this.data = this.device.data();
+        this.data = this.device[];
 
-        if (!loadSuperblock(this.masterSuperblock, this.data))
+        if (!loadSuperblock(this.masterSuperblock, this.device))
         {
             this.progress.dataType = DataType.Message;
             this.progress.message = "Invalid superblock!";
@@ -268,7 +268,7 @@ public:
             this.progress.dataType = DataType.Superblock;
             if (this.loadDevice(devUuid))
             {
-                loadSuperblock(this.superblock, this.data);
+                loadSuperblock(this.superblock, this.device);
                 this.progress.superblock = this.superblock;
                 ownerTid.send(this.progress);
             }
@@ -297,7 +297,7 @@ public:
                 });
             } else
             {
-                hadData = this.superblock.process(this.data.ptr + this.progress.offset, (const ref Superblock superblock)
+                hadData = this.superblock.process(this.device.dataPtr(this.progress.offset, Superblock.sizeof), (const ref Superblock superblock)
                 {
                     this.progress.dataType = DataType.Superblock;
                     this.progress.superblock = superblock;
