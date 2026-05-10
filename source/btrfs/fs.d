@@ -389,9 +389,12 @@ public:
 
     bool hasDevice(const ubyte[UUID_SIZE] deviceUUID) const
     {
-        if (deviceUUID in this.devices)
+        foreach (uuid, _; this.devices)
         {
-            return true;
+            if (uuid == deviceUUID)
+            {
+                return true;
+            }
         }
         return false;
     }
